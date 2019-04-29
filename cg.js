@@ -43,13 +43,19 @@ var argv = require('yargs')
     .boolean('zip')
     .alias('z','zip')
     .describe('zip','Create a .zip file instead of individual files')
+    .boolean('languages')
+    .alias('langs', 'languages')
+    .describe('langs', 'list all available languages')
+    .boolean('configurations')
+    .alias('configs', 'configurations')
+    .describe('configs', 'list all available language config paths')
     .version()
     .argv;
 
 let configStr = argv._[0] || 'nodejs';
 let configName = path.basename(configStr);
 let configPath = path.dirname(configStr);
-if (!configPath || (configPath === '.')) configPath = './configs';
+if (!configPath || (configPath === '.')) configPath = __dirname + '/configs';
 let configFile = path.resolve(configPath,configName)+'.json';
 let config = require(configFile);
 let defName = argv._[1] || './defs/petstore3.json';
@@ -166,6 +172,29 @@ function convert12(api){
     });
 }
 
+function base_dir() {
+    return path.relative(process.cwd(), `${__dirname}/configs`);
+}
+
+function langs(configDir) {
+    const cfd = fs.readdirSync(configDir);
+    const baseDir = base_dir();
+    const langs = configDir !== baseDir
+        ? cfd.concat(fs.readdirSync(baseDir))
+            .filter((l, idx) => idx < cfd.indexOf(l))
+        : cfd;
+    console.log('  ' + langs.map((l) => l.replace('.json', '')).join('\n  '));
+}
+function configs(configDir) {
+    const cfd = fs.readdirSync(configDir).map((l) => `${configDir}/${l}`);
+    const baseDir = base_dir();
+    const langs = configDir !== baseDir
+        ? cfd.concat(fs.readdirSync(baseDir)
+            .map((l) => `${baseDir}/${l}`))
+        : cfd;
+    console.log('  ' + langs.join('\n  '));
+}
+
 function main(s) {
     let o = yaml.parse(s);
     if (argv.verbose) console.log('Loaded definition '+defName);
@@ -203,7 +232,13 @@ if (argv.zip) {
 config.defaults.source = defName;
 
 let up = url.parse(defName);
-if (up.protocol && up.protocol.startsWith('http')) {
+if (argv.langs) {
+    langs(configPath);
+}
+else if(argv.configs) {
+    configs(configPath);
+}
+else if (up.protocol && up.protocol.startsWith('http')) {
     fetch(defName)
     .then(function (res) {
         return res.text();
